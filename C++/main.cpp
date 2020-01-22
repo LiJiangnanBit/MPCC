@@ -52,16 +52,20 @@ int main() {
     Plotting plotter;
 
     Track track;
+    // TrackPos的成员是Eigen::VectorXd，保存赛道的中心线坐标和边界坐标。
     TrackPos track_xy = track.getTrack();
 
     std::list<MPCReturn> log;
     MPC mpc(jsonConfig["n_sqp"],jsonConfig["n_reset"],jsonConfig["sqp_mixing"]);
-    mpc.setTrack(track_xy.X,track_xy.Y);
-    State x0 = {track_xy.X(0),track_xy.Y(0),-1*M_PI/4.0,0.05,0,0,0,1.0,0,1.0};
-    for(int i=0;i<jsonConfig["n_sim"];i++)
+    mpc.setTrack(track_xy.X,track_xy.Y);// 对中心线样条插值
+    State x0 = {track_xy.X(0),track_xy.Y(0),-1*M_PI/4.0,0.05,0,0,0,1.0,0,1.0}; // 10个状态量
+    for(int i=0;i<jsonConfig["n_sim"];i++) // n_sim = 600
     {
-        MPCReturn mpc_sol = mpc.runMPC(x0);
-        x0 = integrator.simTimeStep(x0,mpc_sol.u0,0.02);
+        auto before_solve = std::clock();
+        MPCReturn mpc_sol = mpc.runMPC(x0); // 求解
+        auto after_solve = std::clock();
+        std::cout << "solve time: " << (double) (after_solve - before_solve) / CLOCKS_PER_SEC * 1000 << "ms" << std::endl;
+        x0 = integrator.simTimeStep(x0,mpc_sol.u0,0.02); // 推算下一个状态
         log.push_back(mpc_sol);
     }
     plotter.plotRun(log,track_xy);

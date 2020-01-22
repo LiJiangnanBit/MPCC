@@ -262,13 +262,13 @@ double ArcLengthSpline::porjectOnSpline(const State &x) const
     pos(0) = x.X;
     pos(1) = x.Y;
     double s_guess = x.s;
-    Eigen::Vector2d pos_path = getPostion(s_guess);
+    Eigen::Vector2d pos_path = getPostion(s_guess); // s_guess对应的xy坐标
 
     double s_opt = s_guess;
     double dist = (pos-pos_path).norm();
 
     if (dist >= param.max_dist_proj)
-    {
+    {   // 如果偏差太大，计算未拟合的中心线上离车最近的点。写法可以参考！
         std::cout << "dist too large" << std::endl;
         Eigen::ArrayXd diff_x_all = path_data_.X.array() - pos(0);
         Eigen::ArrayXd diff_y_all = path_data_.Y.array() - pos(1);
@@ -280,11 +280,12 @@ double ArcLengthSpline::porjectOnSpline(const State &x) const
     double s_old = s_opt;
     for(int i=0; i<20; i++)
     {
+        // s_opt是离散点求出的最近距离，这里用牛顿法在连续的样条曲线上找最近点。
         pos_path = getPostion(s_opt);
         Eigen::Vector2d ds_path = getDerivative(s_opt);
         Eigen::Vector2d dds_path = getSecondDerivative(s_opt);
         Eigen::Vector2d diff = pos_path - pos;
-        double jac = 2.0 * diff(0) * ds_path(0) + 2.0 * diff(1) * ds_path(1);
+        double jac = 2.0 * diff(0) * ds_path(0) + 2.0 * diff(1) * ds_path(1); // 对pos_path和车辆当前位置距离的平方 对弧长s求导。
         double hessian = 2.0 * ds_path(0) * ds_path(0) + 2.0 * diff(0) * dds_path(0) +
                          2.0 * ds_path(1) * ds_path(1) + 2.0 * diff(1) * dds_path(1);
         // Newton method

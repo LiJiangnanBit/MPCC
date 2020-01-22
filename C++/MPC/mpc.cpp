@@ -26,7 +26,8 @@ void MPC::setMPCProblem()
 }
 
 void MPC::setStage(const State &xk, const Input &uk, const int time_step)
-{
+{   
+    // 注意这里的xk和uk都是initial_guess_[i]
     stages_[time_step].nx = NX;
     stages_[time_step].nu = NU;
 
@@ -37,12 +38,12 @@ void MPC::setStage(const State &xk, const Input &uk, const int time_step)
     }
     else
     {
-        stages_[time_step].ng = NPC;
-        stages_[time_step].ns = NS;
+        stages_[time_step].ng = NPC; // 3
+        stages_[time_step].ns = NS;  // 3
     }
 
     State xk_nz = xk;
-    xk_nz.vxNonZero();
+    xk_nz.vxNonZero(); // vx不小于0.3
 
     stages_[time_step].cost_mat = cost_.getCost(track_,xk_nz,time_step);
     stages_[time_step].lin_model = model_.getLinModel(xk_nz,uk);
@@ -62,18 +63,24 @@ void MPC::setStage(const State &xk, const Input &uk, const int time_step)
 void MPC::updateInitialGuess(const State &x0)
 {
     for(int i=1;i<N;i++)
-        initial_guess_[i-1] = initial_guess_[i];
+        initial_guess_[i-1] = initial_guess_[i]; // initial_guess_是N+1个元素的vector，元素类型是包含状态量和控制量的类。这里将上一个周期的initial_guess_推了一个周期，即原来的1位置是现在的0位置。
 
     initial_guess_[0].xk = x0;
     initial_guess_[0].uk.setZero();
 
-    initial_guess_[N-1].xk = initial_guess_[N-2].xk;
+    initial_guess_[N-1].xk = initial_guess_[N-2].xk; // 什么作用？
     initial_guess_[N-1].uk.setZero();// = initial_guess_[N-2].uk;
 
-    initial_guess_[N].xk = integrator_.RK4(initial_guess_[N-1].xk,initial_guess_[N-1].uk,TS);
+    initial_guess_[N].xk = integrator_.RK4(initial_guess_[N-1].xk,initial_guess_[N-1].uk,TS); // TODO: 积分得到最后一个状态的估计？具体实现之后再看
     initial_guess_[N].uk.setZero();
-
+    
+    // for (int i = 0; i != N; ++i) {
+    //     std::cout << i << " phi before : " << initial_guess_[i].xk.phi * 180 / M_PI << std::endl;
+    // }
     unwrapInitialGuess();
+    // for (int i = 0; i != N; ++i) {
+    //     std::cout << i << " phi after: " << initial_guess_[i].xk.phi * 180 / M_PI << std::endl;
+    // }
 }
 
 // alternatively OptVariables MPC::unwrapInitialGuess(const OptVariables &initial_guess)
@@ -89,7 +96,7 @@ void MPC::unwrapInitialGuess()
         if((initial_guess_[i].xk.phi - initial_guess_[i-1].xk.phi) > M_PI)
         {
             initial_guess_[i].xk.phi -= 2.*M_PI;
-        }
+        }// 也是为了避免出现-179°和179°的情况。
 
         if((initial_guess_[i].xk.s - initial_guess_[i-1].xk.s) > L/2.)
         {
@@ -147,16 +154,16 @@ MPCReturn MPC::runMPC(State &x0)
 {
     auto t1 = std::chrono::high_resolution_clock::now();
     int solver_status = -1;
-    x0.s = track_.porjectOnSpline(x0);
-    x0.unwrap(track_.getLength());
-    if(valid_initial_guess_)
-        updateInitialGuess(x0);
+    x0.s = track_.porjectOnSpline(x0); // 求出参考线上离车辆位置最近的点的s，里面的方法值得参考。
+    x0.unwrap(track_.getLength()); // ？是要将s从最近点作为0开始算起吗？
+    if(valid_initial_guess_) // 初始是false
+        updateInitialGuess(x0); // 利用上一周期的计算结果生成初始值。
     else
-        generateNewInitialGuess(x0);
+        generateNewInitialGuess(x0); // 按照初始速度定速推算得到初始值。
 
     //TODO: this is one approach to handle solver errors, works well in simulation
     n_no_solves_sqp_ = 0;
-    for(int i=0;i<n_sqp_;i++)
+    for(int i=0;i<n_sqp_;i++) // n_sqp默认是2
     {
         setMPCProblem();
         optimal_solution_ = solver_interface_->solveMPC(stages_,x0, &solver_status);

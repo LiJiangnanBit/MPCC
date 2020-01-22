@@ -71,7 +71,9 @@ ErrorInfo Cost::getErrorInfo(const ArcLengthSpline &track,const State &x) const
 
     Eigen::Matrix<double,2,NX> d_contouring_error = Eigen::Matrix<double,2,NX>::Zero();
     // compute all remaining partial derivatives and store the in dError
-    d_contouring_error(0,si_index.X) =  std::sin(track_point.theta_ref);
+    // si_index是定义在config.h里的对象。学习这种写法
+    // 下面的导数指的是contouring error和lag error分别对十个状态量的导数。
+    d_contouring_error(0,si_index.X) =  std::sin(track_point.theta_ref); 
     d_contouring_error(0,si_index.Y) = -std::cos(track_point.theta_ref);
     d_contouring_error(0,si_index.s) = dContouringError;
 
@@ -84,6 +86,7 @@ ErrorInfo Cost::getErrorInfo(const ArcLengthSpline &track,const State &x) const
 
 CostMatrix Cost::getBetaCost(const State &x) const
 {
+    // a side slip angle cost which controls the aggressiveness of the MPC
 //    CostMatrix beta_cost;
     const double vx = x.vx;
     const double vy = x.vy;
@@ -106,7 +109,7 @@ CostMatrix Cost::getContouringCost(const ArcLengthSpline &track, const State &x,
     // compute reference information
     const StateVector x_vec = stateToVector(x);
     // compute error and jacobean of error
-    const ErrorInfo error_info = getErrorInfo(track,x);
+    const ErrorInfo error_info = getErrorInfo(track,x); // 返回值是error（包括contouring 和lag error）以及分别对十个状态量的导数（雅克比矩阵）
     // contouring cost matrix
     Eigen::Matrix2d ContouringCost;
     ContouringCost.setZero(2,2);
@@ -116,8 +119,8 @@ CostMatrix Cost::getContouringCost(const ArcLengthSpline &track, const State &x,
         ContouringCost(0,0) = cost_param.q_c_N_mult*cost_param.q_c;
     ContouringCost(1,1) = cost_param.q_l;
     // contouring and lag error part
-    Q_MPC Q_contouring_cost = Q_MPC::Zero();
-    q_MPC q_contouring_cost = q_MPC::Zero();
+    Q_MPC Q_contouring_cost = Q_MPC::Zero(); // 10x10
+    q_MPC q_contouring_cost = q_MPC::Zero(); // 10x1
     Q_contouring_cost = error_info.d_error.transpose()*ContouringCost*error_info.d_error;
     // regularization cost on yaw rate
     if(k<N)
@@ -141,8 +144,8 @@ CostMatrix Cost::getContouringCost(const ArcLengthSpline &track, const State &x,
 CostMatrix Cost::getInputCost() const
 {
     // input cost and rate of chagen of real inputs
-    Q_MPC Q_input_cost = Q_MPC::Zero();
-    R_MPC R_input_cost = R_MPC::Zero();
+    Q_MPC Q_input_cost = Q_MPC::Zero(); // 10x10
+    R_MPC R_input_cost = R_MPC::Zero(); // 3x3
     // cost of "real" inputs
     Q_input_cost(si_index.D,si_index.D) = cost_param.r_D;
     Q_input_cost(si_index.delta,si_index.delta) = cost_param.r_delta;
@@ -179,9 +182,9 @@ CostMatrix Cost::getSoftConstraintCost() const
 CostMatrix Cost::getCost(const ArcLengthSpline &track, const State &x,const int k) const
 {
     // generate quadratic cost function
-    const CostMatrix contouring_cost = getContouringCost(track,x,k);
+    const CostMatrix contouring_cost = getContouringCost(track,x,k); // k表示time_step
     const CostMatrix input_cost = getInputCost();
-    const CostMatrix beta_cost = getBetaCost(x);
+    const CostMatrix beta_cost = getBetaCost(x); //a side slip angle cost which controls the aggressiveness of the MPC
     const CostMatrix soft_con_cost = getSoftConstraintCost();
 
     Q_MPC Q_not_sym = contouring_cost.Q + input_cost.Q + beta_cost.Q;

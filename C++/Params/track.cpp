@@ -16,6 +16,7 @@
 
 #include "track.h"
 namespace mpcc{
+    // 获取赛道的xy坐标和边界的xy坐标。
 TrackPos Track::getTrack()
 {
     /////////////////////////////////////////////////////
@@ -36,6 +37,7 @@ TrackPos Track::getTrack()
 //    TrackPos track_xy;
 //    track_xy.X = Eigen::Map<Eigen::VectorXd>(X.data(), X.size());
 //    track_xy.Y = Eigen::Map<Eigen::VectorXd>(Y.data(), Y.size());
+    // vector的.data()返回第一个元素的地址。注意是实际的地址，与.begin()不同。
     return {Eigen::Map<Eigen::VectorXd>(X.data(), X.size()), Eigen::Map<Eigen::VectorXd>(Y.data(), Y.size()),
             Eigen::Map<Eigen::VectorXd>(X_inner.data(), X_inner.size()), Eigen::Map<Eigen::VectorXd>(Y_inner.data(), Y_inner.size()),
             Eigen::Map<Eigen::VectorXd>(X_outer.data(), X_outer.size()), Eigen::Map<Eigen::VectorXd>(Y_outer.data(), Y_outer.size())};
